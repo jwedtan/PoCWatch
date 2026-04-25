@@ -1,4 +1,4 @@
-# PoCWatch
+# <img src="src/app/icon.svg" alt="" width="28" height="28" valign="middle" /> PoCWatch
 
 A live triage dashboard for newly published CVEs, enriched with EPSS exploit-likelihood scores, NVD reference tags (Patch / Exploit / Vendor Advisory / etc.), affected products, and links to public proof-of-concept repositories on GitHub.
 

@@ -1,0 +1,39 @@
+# Dependencies — re-installed inside the image
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js build artifacts
+.next
+out
+
+# Local env files (never bake secrets into the image)
+.env
+.env.local
+.env.*.local
+
+# VCS / tooling
+.git
+.gitignore
+.github
+
+# Editor / OS noise
+.vscode
+.idea
+.cursor
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Project-local terminal/agent state
+terminals/
+agent-transcripts/
+
+# Docs / CI files not needed at runtime
+README.md
+LICENSE
+Dockerfile
+.dockerignore
+docker-compose.yml

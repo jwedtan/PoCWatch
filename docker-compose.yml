@@ -1,0 +1,24 @@
+services:
+  pocwatch:
+    container_name: pocwatch
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Or pull a published image instead of building locally:
+    # image: ghcr.io/your-username/pocwatch:latest
+    ports:
+      - "3000:3000"
+    environment:
+      # Optional but strongly recommended — lifts GitHub PoC search rate limits
+      # from 10 req/min (unauthenticated) to 30 req/min.
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      # Optional — request a key at https://nvd.nist.gov/developers/request-an-api-key
+      - NVD_API_KEY=${NVD_API_KEY:-}
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

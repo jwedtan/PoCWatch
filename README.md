@@ -4,6 +4,12 @@ A live triage dashboard for newly published CVEs, enriched with EPSS exploit-lik
 
 Built to answer the only question that matters during a vulnerability scramble: **which of yesterday's CVEs already have working exploits?**
 
+
+<img width="1916" height="1027" alt="image" src="https://github.com/user-attachments/assets/42ae0208-b962-4038-a9b7-d854de910f6d" />
+<br> 
+<img width="1917" height="957" alt="image" src="https://github.com/user-attachments/assets/bbb79421-b5c2-4ab0-85da-63bdd06e679a" />
+
+
 ---
 
 ## Features

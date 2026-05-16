@@ -6,7 +6,8 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 
 # libc6-compat is recommended by the Next.js team for some Alpine builds.
-RUN apk add --no-cache libc6-compat
+# python3 / make / g++ are required to compile better-sqlite3 during npm ci.
+RUN apk add --no-cache libc6-compat python3 make g++
 
 COPY package.json package-lock.json* ./
 RUN npm ci
@@ -41,6 +42,8 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
 USER nextjs
 

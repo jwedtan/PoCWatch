@@ -33,7 +33,6 @@ agent-transcripts/
 
 # Docs / CI files not needed at runtime
 README.md
-LICENSE
 Dockerfile
 .dockerignore
 docker-compose.yml

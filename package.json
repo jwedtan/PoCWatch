@@ -2,6 +2,12 @@
   "name": "pocwatch",
   "version": "0.1.0",
   "private": true,
+  "description": "CVE triage dashboard with EPSS, PoC discovery, and asset-aware prioritization",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jwedtan/PoCWatch.git"
+  },
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
@@ -9,6 +15,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "better-sqlite3": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.9.0",
@@ -23,6 +30,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

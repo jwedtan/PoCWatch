@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install native build tools (better-sqlite3)
+        run: sudo apt-get update && sudo apt-get install -y python3 make g++
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - name: Production build
+        run: npm run build
+        env:
+          # Avoid live upstream calls during static generation where possible.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

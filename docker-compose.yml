@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
     # Or pull a published image instead of building locally:
-    # image: ghcr.io/your-username/pocwatch:latest
+    # image: ghcr.io/jwedtan/pocwatch:latest
     ports:
       - "3000:3000"
     environment:
@@ -14,7 +14,11 @@ services:
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       # Optional — request a key at https://nvd.nist.gov/developers/request-an-api-key
       - NVD_API_KEY=${NVD_API_KEY:-}
+      # Optional — override default SQLite path (see .env.example)
+      - SQLITE_PATH=${SQLITE_PATH:-}
       - NODE_ENV=production
+    volumes:
+      - pocwatch-data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
@@ -22,3 +26,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+volumes:
+  pocwatch-data:

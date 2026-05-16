@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# server-side SQLite asset DB (keep directory via data/.gitkeep)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+!data/.gitkeep

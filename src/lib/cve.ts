@@ -1,6 +1,23 @@
+import { unstable_cache } from "next/cache";
+
 export type SeverityLevel = "Critical" | "High" | "Medium" | "Low" | "Unknown";
 
 export type CpeType = "application" | "os" | "hardware" | "unknown";
+
+// Display-friendly label for a CpeType. Special-cases "os" → "OS" so the
+// abbreviation isn't rendered as "Os" by `text-transform: capitalize`.
+export function formatCpeType(type: CpeType): string {
+  switch (type) {
+    case "os":
+      return "OS";
+    case "application":
+      return "Application";
+    case "hardware":
+      return "Hardware";
+    case "unknown":
+      return "Unknown";
+  }
+}
 
 export type AffectedProduct = {
   vendor: string;
@@ -421,9 +438,13 @@ async function fetchCveOrgAffected(cveId: string): Promise<AffectedProduct[]> {
   const endpoint = `https://cveawg.mitre.org/api/cve/${encodeURIComponent(cveId)}`;
 
   try {
+    // CVE.org is a *fallback* used only when NVD lacks affected configurations,
+    // so a slow upstream shouldn't block the whole dashboard render. 4s keeps
+    // the worst-case page latency bounded.
     const response = await fetch(endpoint, {
       headers: { "User-Agent": "pocwatch" },
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(4000),
     });
 
     if (!response.ok) {
@@ -433,7 +454,11 @@ async function fetchCveOrgAffected(cveId: string): Promise<AffectedProduct[]> {
     const payload = (await response.json()) as CveOrgResponse;
     return extractAffectedFromCveOrg(payload);
   } catch (error) {
-    console.warn(`CVE.org lookup failed for ${cveId}:`, error);
+    if (error instanceof Error && error.name === "TimeoutError") {
+      console.warn(`CVE.org lookup timed out for ${cveId}`);
+    } else {
+      console.warn(`CVE.org lookup failed for ${cveId}:`, error);
+    }
     return [];
   }
 }
@@ -692,7 +717,19 @@ async function fetchPocsForCve(cveId: string): Promise<PocReference[]> {
   }));
 }
 
-export async function getDashboardData(): Promise<CveRecord[]> {
+// The 200-CVE enrichment (NVD + EPSS + GitHub + CVE.org per record) is expensive
+// and the data only changes when NVD publishes new vulnerabilities, so the
+// build is cached via Next.js's data cache for 15 minutes and shared across
+// every request that lands within that window.
+//
+// On-demand searches for CVEs older than the 30-day window flow through
+// `lookupCveById` / `fetchCveById`, which intentionally bypass this cache and
+// hit NVD directly each time.
+const DASHBOARD_CACHE_TAG = "pocwatch-dashboard";
+const DASHBOARD_CACHE_TTL_S = 15 * 60; // 15 minutes
+
+async function buildDashboardData(): Promise<CveRecord[]> {
+  console.log("[dashboard] cache miss — fetching fresh data from upstreams");
   const cves = await fetchRecentCves(200);
   if (cves.length === 0) {
     return [];
@@ -726,3 +763,18 @@ export async function getDashboardData(): Promise<CveRecord[]> {
 
   return enriched;
 }
+
+// Wrapped with `unstable_cache` so the expensive dashboard build only runs
+// once every 15 minutes regardless of how many users / navigations hit the
+// page. The cache survives across requests, workers, and dev HMR via Next.js's
+// data cache, and can be busted with `revalidateTag(DASHBOARD_CACHE_TAG)`.
+export const getDashboardData: () => Promise<CveRecord[]> = unstable_cache(
+  buildDashboardData,
+  ["pocwatch-dashboard-v1"],
+  {
+    revalidate: DASHBOARD_CACHE_TTL_S,
+    tags: [DASHBOARD_CACHE_TAG],
+  },
+);
+
+export { DASHBOARD_CACHE_TAG };

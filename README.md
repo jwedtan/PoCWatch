@@ -13,7 +13,8 @@ Built to answer the only question that matters during a vulnerability scramble: 
 - **PoC discovery** — searches GitHub for repositories mentioning each CVE ID and surfaces stars, last push date, and description.
 - **Exploit-tagged references** — calls out NVD references tagged `Exploit`, `Vendor Advisory`, `Patch`, `Mitigation`, etc., so you can jump straight to the proof or the fix.
 - **Affected products** — parses NVD CPE configurations and falls back to the CVE.org (MITRE) record when NVD's enrichment lags behind publication, so newly disclosed software (e.g. mailcow) shows up immediately.
-- **Severity-prioritized tabs** — `Critical`, `High`, `With PoC / Exploit`, and `All`, with custom-tinted severity badges.
+- **Asset-aware prioritization** — define the software / OS you actually run on the `/assets` page; inventory is stored in **SQLite on the server** (not in the browser). PoCWatch surfaces a **My assets** tab plus a match badge on every CVE that hits your stack, with `exact` / `likely` / `possible` confidence based on vendor, product, and version-range matching.
+- **Severity-prioritized tabs** — `My assets`, `Critical`, `High`, `With PoC / Exploit`, and `All`, with custom-tinted severity badges.
 - **Tag filters** — multi-select chips with AND semantics across NVD reference tags.
 - **On-demand lookup** — search any CVE by exact ID; if it isn't in the 30-day window it's fetched live from NVD and merged into the view.
 - **Light / dark / system theme** — use the theme that suits your preference.
@@ -28,7 +29,7 @@ Built to answer the only question that matters during a vulnerability scramble: 
 - [Tailwind CSS 4](https://tailwindcss.com/) + [Shadcn UI](https://ui.shadcn.com/)
 - [lucide-react](https://lucide.dev/) icons
 - [next-themes](https://github.com/pacocoursey/next-themes) for theme switching
-- [Docker](https://www.docker.com/) multi-stage build using Next.js' `output: "standalone"` mode
+- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) for the `/assets` inventory (WAL mode, file under `data/` by default)
 
 ### Data sources
 
@@ -56,8 +57,8 @@ The fastest way to run PoCWatch — no Node toolchain required.
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/<your-username>/pocwatch.git
-cd pocwatch
+git clone https://github.com/jwedtan/PoCWatch.git
+cd PoCWatch
 cp .env.example .env
 ```
 
@@ -77,6 +78,8 @@ docker compose up -d
 ```
 
 First build takes 2–4 minutes (npm install + `next build`). Subsequent restarts are instant.
+
+Asset inventory is persisted in a **Docker volume** (`pocwatch-data` → `/app/data` in the container, default DB file `pocwatch.db`). To wipe inventory and start over: `docker compose down -v`.
 
 ### 3. Open the dashboard
 
@@ -109,6 +112,7 @@ If you'd rather not use Compose:
 docker build -t pocwatch .
 docker run --rm -p 3000:3000 \
   -e GITHUB_TOKEN=ghp_your_personal_access_token \
+  -v pocwatch-data:/app/data \
   --name pocwatch \
   pocwatch
 ```
@@ -126,6 +130,8 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). File saves trigger fast refresh.
+
+The asset inventory lives in SQLite at **`data/pocwatch.db`** (created on first write). Override the path with **`SQLITE_PATH`** in `.env.local` (relative paths resolve from the project root / process cwd).
 
 ### Other scripts
 
@@ -145,24 +151,75 @@ npm run lint     # ESLint
 src/
   app/
     actions.ts          # Server Actions (lookupCveById)
+    asset-actions.ts    # Server Actions for asset CRUD + JSON import
+    assets/page.tsx     # /assets — inventory CRUD + import/export
     globals.css         # Tailwind + theme tokens (teal / mist palette)
     icon.svg            # Favicon (binoculars on teal tile)
     layout.tsx          # Root layout, ThemeProvider, metadata
-    page.tsx            # Server component, fetches dashboard data
+    page.tsx            # Server component, fetches dashboard + asset list
   components/
-    cve-dashboard.tsx   # Main client UI (search, tabs, cards, filters)
+    asset-manager.tsx   # Client UI for /assets (form, list, import/export)
+    cve-dashboard.tsx   # Main client UI (search, tabs, cards, filters, asset matches)
+    site-header.tsx     # Shared header + nav (Dashboard / Assets)
     theme-provider.tsx  # next-themes wrapper
     theme-toggle.tsx    # Light/dark/system menu
     ui/                 # Shadcn primitives
   lib/
+    asset-db.ts         # SQLite persistence for assets (better-sqlite3)
+    asset-match.ts      # Pure matching: (assets, cve) → AssetMatch[] + relevance score
+    assets.ts           # Asset types, validation, import sanitization, export helpers
     cve.ts              # All data fetching, parsing, and enrichment
     utils.ts            # cn() helper
+data/
+  .gitkeep              # Keeps data/ in git; DB files are git-ignored
 Dockerfile              # Multi-stage build → standalone Next.js runtime
 docker-compose.yml      # One-command deploy with healthcheck + restart policy
 .dockerignore           # Keeps node_modules / .next / .env out of the build context
 .env.example            # Template for .env (Docker) and .env.local (npm dev)
-next.config.ts          # output: "standalone", devIndicators disabled
+next.config.ts          # output: "standalone", better-sqlite3 externalized for server
 ```
+
+---
+
+## Asset management
+
+PoCWatch lets you track the software and operating systems you actually run so the dashboard can prioritize CVEs that hit *your* stack.
+
+### Add assets
+
+Visit `/assets` (or click **Assets** in the top nav) and add entries like:
+
+| Field | Example | Notes |
+| --- | --- | --- |
+| Label / hostname | `prod-web-01` | Optional, free text |
+| Vendor | `nginx` | Required |
+| Product | `nginx` | Required |
+| Version | `1.24.0` | Optional; enables version-range comparison |
+| Type | `application` / `os` / `hardware` | Used as a hint, not a hard filter |
+| Environment | `prod` / `staging` / `dev` / `other` | Optional tag |
+
+Assets are stored in a **SQLite database on the PoCWatch server** (default file `data/pocwatch.db`, overridable with `SQLITE_PATH`). Everyone hitting the same deployment shares one inventory — use **Export JSON** for backups or to move data between environments, and **Import JSON** to merge or replace (max **2,000** entries per file).
+
+### How matching works
+
+For every CVE in the feed, `matchCveToAssets` (in `src/lib/asset-match.ts`) compares each asset against the CVE's `affected` configurations:
+
+- **Vendor / product:** normalized to lowercase, separators collapsed, then matched with prefix/substring fuzziness. So `Apache HTTP Server`, `apache_http_server`, and `apache httpd` all align.
+- **Version:** the `versionRange` string (`>= 1.20.0, < 1.25.0`, `all versions`, or an exact version) is parsed back into structured bounds and compared to your asset's version segment-by-segment.
+- **Confidence:**
+  - `exact` — vendor and product both match exactly **and** your version falls inside a bounded range.
+  - `likely` — vendor and product match but the asset has no version, or the CVE covers all versions.
+  - `possible` — fuzzy vendor *or* product match only.
+
+### Prioritization
+
+When you have at least one asset defined:
+
+- The dashboard gains a **My assets** tab (shown first by default) listing CVEs that matched your inventory, sorted by match confidence, severity, EPSS, and PoC availability.
+- Each matching CVE card shows a colored match badge (`exact` / `likely` / `possible`) and an expandable **Asset matches** section explaining *why* it matched (vendor & product hit, version inside range, etc.).
+- A fourth summary card shows the count of CVEs hitting your tracked assets.
+
+> **Caveat:** matching surfaces *possible* hits — treat them as triage starting points, not as a definitive “you are vulnerable” signal. NVD's affected-product data is often incomplete or coarse-grained (e.g. wildcards), so verify against vendor advisories before acting.
 
 ---
 
@@ -212,6 +269,19 @@ Then browse to `http://localhost:8080`.
 
 ---
 
+## Security & self-hosting
+
+PoCWatch is a **self-hosted triage tool**, not a multi-tenant SaaS.
+
+- **No authentication** — anyone who can open the URL can view the dashboard and **create, edit, delete, or import** assets (stored in SQLite on the server).
+- **One inventory per instance** — all users of the same deployment share the same asset database.
+- **Do not expose port 3000 directly to the public internet** without putting the app behind a reverse proxy and an auth layer (OAuth2 proxy, Authelia, VPN, etc.).
+- **JSON import** is capped at **2,000 entries** per file to reduce accidental or malicious overload.
+
+See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
+
+---
+
 ## Notes & limitations
 
 - **NVD rate limits** are aggressive for unauthenticated clients. The app degrades gracefully (returns an empty list) rather than throwing.
@@ -221,6 +291,10 @@ Then browse to `http://localhost:8080`.
 
 ---
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
-MIT — for personal / research use. The data fetched belongs to its respective sources (NIST, MITRE, FIRST.org, GitHub).
+[MIT](LICENSE) — for personal / research use. CVE and enrichment data belong to their respective sources (NIST, MITRE, FIRST.org, GitHub).

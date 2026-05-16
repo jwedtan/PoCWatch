@@ -4,11 +4,11 @@ A live triage dashboard for newly published CVEs, enriched with EPSS exploit-lik
 
 Built to answer the only question that matters during a vulnerability scramble: **which of yesterday's CVEs already have working exploits?**
 
-
-<img width="1916" height="1027" alt="image" src="https://github.com/user-attachments/assets/42ae0208-b962-4038-a9b7-d854de910f6d" />
-<br> 
-<img width="1917" height="957" alt="image" src="https://github.com/user-attachments/assets/bbb79421-b5c2-4ab0-85da-63bdd06e679a" />
-
+<img width="1278" height="1078" alt="image" src="https://github.com/user-attachments/assets/b878d3bb-bc0f-44bf-9827-11fcf0080e09" />
+<br>
+<img width="1264" height="1234" alt="image" src="https://github.com/user-attachments/assets/c35e5e42-6fa8-43a5-adc4-b9ee1f2e06f1" />
+<br>
+<img width="1287" height="1134" alt="image" src="https://github.com/user-attachments/assets/9055f485-0285-4cdc-bc75-74db47d8a0c7" />
 
 ---
 
@@ -19,7 +19,7 @@ Built to answer the only question that matters during a vulnerability scramble: 
 - **PoC discovery** — searches GitHub for repositories mentioning each CVE ID and surfaces stars, last push date, and description.
 - **Exploit-tagged references** — calls out NVD references tagged `Exploit`, `Vendor Advisory`, `Patch`, `Mitigation`, etc., so you can jump straight to the proof or the fix.
 - **Affected products** — parses NVD CPE configurations and falls back to the CVE.org (MITRE) record when NVD's enrichment lags behind publication, so newly disclosed software (e.g. mailcow) shows up immediately.
-- **Asset-aware prioritization** — define the software / OS you actually run on the `/assets` page; inventory is stored in **SQLite on the server** (not in the browser). PoCWatch surfaces a **My assets** tab plus a match badge on every CVE that hits your stack, with `exact` / `likely` / `possible` confidence based on vendor, product, and version-range matching.
+- **Asset-aware prioritization** — define the software / OS you actually run on the `/assets` page; inventory is stored in **SQLite on the server**. PoCWatch surfaces a **My assets** tab plus a match badge on every CVE that hits your stack, with `exact` / `likely` / `possible` confidence based on vendor, product, and version-range matching.
 - **Severity-prioritized tabs** — `My assets`, `Critical`, `High`, `With PoC / Exploit`, and `All`, with custom-tinted severity badges.
 - **Tag filters** — multi-select chips with AND semantics across NVD reference tags.
 - **On-demand lookup** — search any CVE by exact ID; if it isn't in the 30-day window it's fetched live from NVD and merged into the view.
